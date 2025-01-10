@@ -61,7 +61,7 @@ show_menu() {
     echo -e "\n${BLUE}=== Git SSH Key Manager ===${NC}"
     echo "1. Generate new SSH key"
     echo "2. Show key adding instructions"
-    echo "3. Configure Git user"
+    echo "3. Configure Git user (Github Only)"
     echo "4. List existing SSH keys"
     echo "5. Test SSH connection"
     echo "6. Delete an SSH key"

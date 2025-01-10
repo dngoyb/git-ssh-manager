@@ -36,7 +36,7 @@ chmod +x git-ssh-manager.sh
 1. Open Git Bash (NOT Command Prompt or PowerShell)
 2. Download the script:
 ```bash
-curl -O https://raw.githubusercontent.com/yourusername/git-ssh-manager/main/git-ssh-manager.sh
+curl -O https://raw.githubusercontent.com/dngoyb/git-ssh-manager/main/git-ssh-manager.sh
 ```
 
 3. Make it executable:
