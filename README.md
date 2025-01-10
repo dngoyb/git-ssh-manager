@@ -24,7 +24,7 @@ A bash script for managing multiple SSH keys for different Git providers (GitHub
 ### Linux and macOS
 1. Download the script:
 ```bash
-curl -O https://raw.githubusercontent.com/yourusername/git-ssh-manager/main/git-ssh-manager.sh
+curl -O https://raw.githubusercontent.com/dngoyb/git-ssh-manager/main/git-ssh-manager.sh
 ```
 
 2. Make it executable:
