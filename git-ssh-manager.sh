@@ -6,6 +6,9 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Global variable to store the email
+EMAIL=""
+
 # Function to display instructions based on the operating system
 install_instructions() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -31,23 +34,19 @@ install_instructions() {
 
 # Check if openssh is installed
 if ! command -v ssh &> /dev/null; then
-    echo "Error: OpenSSH is not installed."
+    echo -e "${RED}Error: OpenSSH is not installed.${NC}"
     install_instructions
     exit 1
 fi
-
 
 # Check Operating System
 check_os() {
     case "$(uname -s)" in
         Darwin*) 
-            echo ""   
             echo -e "${BLUE}Running on macOS${NC}" ;;
         Linux*) 
-            echo ""
             echo -e "${BLUE}Running on Linux${NC}" ;;
         CYGWIN*|MINGW*|MSYS*) 
-            echo ""
             echo -e "${BLUE}Running on Windows (Git Bash)${NC}" ;;
         *)          
             echo -e "${RED}Unsupported operating system. Please use Linux, macOS, or Git Bash on Windows.${NC}"
@@ -68,7 +67,7 @@ show_menu() {
     echo "7. Exit"
 }
 
-# Rest of the functions remain the same as before
+# Function to generate SSH key
 generate_ssh_key() {
     echo -e "\n${BLUE}=== Generate SSH Key ===${NC}"
     echo "Select Git provider:"
@@ -86,6 +85,9 @@ generate_ssh_key() {
 
     read -p "Enter a unique identifier for this key (e.g., personal, work): " identifier
     read -p "Enter your email: " email
+
+    # Store the email globally for later use
+    EMAIL="$email"
 
     key_name="${provider_name}_${identifier}"
     key_path="$HOME/.ssh/${key_name}"
@@ -128,11 +130,15 @@ test_connection() {
 # Function to configure Git user
 configure_git() {
     echo -e "\n${BLUE}=== Configure Git User ===${NC}"
+    if [ -z "$EMAIL" ]; then
+        echo -e "${RED}No email found. Please generate an SSH key first to store the email.${NC}"
+        return 1
+    fi
+
     read -p "Enter your name: " name
-    read -p "Enter your email: " email
 
     git config --global user.name "$name"
-    git config --global user.email "$email"
+    git config --global user.email "$EMAIL"
 
     echo -e "${GREEN}Git user configured successfully!${NC}"
     echo -e "\nCurrent Git configuration:"
