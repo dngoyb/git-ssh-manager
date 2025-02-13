@@ -148,13 +148,20 @@ configure_git() {
 # Function to list existing SSH keys
 list_keys() {
     echo -e "\n${BLUE}=== Existing SSH Keys ===${NC}"
+    keys=()
+    i=1
     for key in ~/.ssh/github_* ~/.ssh/gitlab_* ~/.ssh/bitbucket_*; do
         if [ -f "$key" ] && [[ $key != *".pub" ]]; then
-            echo -e "\nKey: ${GREEN}$(basename "$key")${NC}"
+            keys+=("$key")
+            echo -e "\n$i. Key: ${GREEN}$(basename "$key")${NC}"
             echo "Public key:"
             cat "$key.pub"
+            ((i++))
         fi
     done
+    if [ ${#keys[@]} -eq 0 ]; then
+        echo -e "${RED}No SSH keys found.${NC}"
+    fi
 }
 
 # Function to show instructions for adding keys
@@ -180,26 +187,44 @@ show_instructions() {
 # Function to delete an SSH key
 delete_key() {
     echo -e "\n${BLUE}=== Delete SSH Key ===${NC}"
-    list_keys
+    keys=()
+    i=1
+    for key in ~/.ssh/github_* ~/.ssh/gitlab_* ~/.ssh/bitbucket_*; do
+        if [ -f "$key" ] && [[ $key != *".pub" ]]; then
+            keys+=("$key")
+            echo -e "\n$i. Key: ${GREEN}$(basename "$key")${NC}"
+            echo "Public key:"
+            cat "$key.pub"
+            ((i++))
+        fi
+    done
 
-    read -p "Enter the name of the key you want to delete: " key_to_delete
-
-    key_path="$HOME/.ssh/${key_to_delete}"
-    if [ -f "$key_path" ] && [[ $key_to_delete == *"_"* ]]; then
-        # Remove key from SSH agent
-        ssh-add -d "$key_path"
-
-        # Remove key from SSH config
-        sed -i.bak "/Host.*${key_to_delete//\//\\/}/d" "$HOME/.ssh/config"
-
-        # Remove key files
-        rm "$key_path"
-        rm "${key_path}.pub"
-
-        echo -e "${GREEN}SSH key '${key_to_delete}' deleted successfully!${NC}"
-    else
-        echo -e "${RED}Invalid key name or key not found.${NC}"
+    if [ ${#keys[@]} -eq 0 ]; then
+        echo -e "${RED}No SSH keys found to delete.${NC}"
+        return 1
     fi
+
+    read -p "Enter the number of the key you want to delete (1-${#keys[@]}): " key_number
+
+    if [[ $key_number -lt 1 || $key_number -gt ${#keys[@]} ]]; then
+        echo -e "${RED}Invalid selection. Please enter a number between 1 and ${#keys[@]}.${NC}"
+        return 1
+    fi
+
+    key_to_delete="${keys[$((key_number-1))]}"
+    key_name=$(basename "$key_to_delete")
+
+    # Remove key from SSH agent
+    ssh-add -d "$key_to_delete"
+
+    # Remove key from SSH config
+    sed -i.bak "/Host.*${key_name//\//\\/}/d" "$HOME/.ssh/config"
+
+    # Remove key files
+    rm "$key_to_delete"
+    rm "${key_to_delete}.pub"
+
+    echo -e "${GREEN}SSH key '${key_name}' deleted successfully!${NC}"
 }
 
 # Main loop
