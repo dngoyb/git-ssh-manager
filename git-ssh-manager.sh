@@ -60,7 +60,7 @@ show_menu() {
     echo -e "\n${BLUE}=== Git SSH Key Manager ===${NC}"
     echo "1. Generate new SSH key"
     echo "2. Show key adding instructions"
-    echo "3. Configure Git user (Github Only)"
+    echo "3. Configure Git user (GitHub Only)"
     echo "4. List existing SSH keys"
     echo "5. Test SSH connection"
     echo "6. Delete an SSH key"
@@ -75,7 +75,6 @@ generate_ssh_key() {
     echo "2. GitLab"
     echo "3. Bitbucket"
     read -p "Enter choice (1-3): " provider
-
     case $provider in
         1) provider_name="github" ;;
         2) provider_name="gitlab" ;;
@@ -83,27 +82,63 @@ generate_ssh_key() {
         *) echo -e "${RED}Invalid choice${NC}"; return 1 ;;
     esac
 
-    read -p "Enter a unique identifier for this key (e.g., personal, work): " identifier
+    # Prompt for unique identifier
+    while true; do
+        read -p "Enter a unique identifier for this key (e.g., personal, work) [leave empty for default]: " identifier
+        if [[ -z "$identifier" ]]; then
+            key_name="${provider_name}"
+            break
+        elif [[ -f "$HOME/.ssh/${provider_name}_${identifier}" ]]; then
+            echo -e "${RED}A key with this identifier already exists. Please choose a different one.${NC}"
+            continue
+        else
+            key_name="${provider_name}_${identifier}"
+            break
+        fi
+    done
+
     read -p "Enter your email: " email
+    if [[ -z "$email" ]]; then
+        echo -e "${RED}Email cannot be empty. Exiting key generation.${NC}"
+        return 1
+    fi
 
     # Store the email globally for later use
     EMAIL="$email"
+    key_path="$HOME/.ssh/$key_name"
 
-    key_name="${provider_name}_${identifier}"
-    key_path="$HOME/.ssh/${key_name}"
+    # Backup the original SSH config file
+    cp "$HOME/.ssh/config" "$HOME/.ssh/config.backup" 2>/dev/null
 
     # Generate SSH key
-    ssh-keygen -t ed25519 -C "$email" -f "$key_path"
+    ssh-keygen -t ed25519 -C "$email" -f "$key_path" || {
+        echo -e "${RED}Failed to generate SSH key. Resetting configuration...${NC}"
+        mv "$HOME/.ssh/config.backup" "$HOME/.ssh/config" 2>/dev/null
+        rm -f "$key_path" "${key_path}.pub"
+        return 1
+    }
 
     # Add to SSH config
-    echo -e "\nHost ${provider_name}.com-${identifier}
+    if [[ -z "$identifier" ]]; then
+        echo -e "\nHost ${provider_name}.com
     HostName ${provider_name}.com
     User git
     IdentityFile $key_path" >> "$HOME/.ssh/config"
+    else
+        echo -e "\nHost ${provider_name}.com-${identifier}
+    HostName ${provider_name}.com
+    User git
+    IdentityFile $key_path" >> "$HOME/.ssh/config"
+    fi
 
     # Start ssh-agent and add key
     eval "$(ssh-agent -s)"
-    ssh-add "$key_path"
+    ssh-add "$key_path" || {
+        echo -e "${RED}Failed to add key to ssh-agent. Resetting configuration...${NC}"
+        mv "$HOME/.ssh/config.backup" "$HOME/.ssh/config" 2>/dev/null
+        rm -f "$key_path" "${key_path}.pub"
+        return 1
+    }
 
     echo -e "${GREEN}SSH key generated successfully!${NC}"
     echo -e "Public key (copy this to your Git provider):\n"
@@ -118,7 +153,6 @@ test_connection() {
     echo "2. GitLab"
     echo "3. Bitbucket"
     read -p "Enter choice (1-3): " provider
-
     case $provider in
         1) ssh -T git@github.com ;;
         2) ssh -T git@gitlab.com ;;
@@ -134,12 +168,9 @@ configure_git() {
         echo -e "${RED}No email found. Please generate an SSH key first to store the email.${NC}"
         return 1
     fi
-
     read -p "Enter your name: " name
-
     git config --global user.name "$name"
     git config --global user.email "$EMAIL"
-
     echo -e "${GREEN}Git user configured successfully!${NC}"
     echo -e "\nCurrent Git configuration:"
     git config --global --list
@@ -150,7 +181,7 @@ list_keys() {
     echo -e "\n${BLUE}=== Existing SSH Keys ===${NC}"
     keys=()
     i=1
-    for key in ~/.ssh/github_* ~/.ssh/gitlab_* ~/.ssh/bitbucket_*; do
+    for key in ~/.ssh/github_* ~/.ssh/gitlab_* ~/.ssh/bitbucket_* ~/.ssh/github ~/.ssh/gitlab ~/.ssh/bitbucket; do
         if [ -f "$key" ] && [[ $key != *".pub" ]]; then
             keys+=("$key")
             echo -e "\n$i. Key: ${GREEN}$(basename "$key")${NC}"
@@ -189,7 +220,7 @@ delete_key() {
     echo -e "\n${BLUE}=== Delete SSH Key ===${NC}"
     keys=()
     i=1
-    for key in ~/.ssh/github_* ~/.ssh/gitlab_* ~/.ssh/bitbucket_*; do
+    for key in ~/.ssh/github_* ~/.ssh/gitlab_* ~/.ssh/bitbucket_* ~/.ssh/github ~/.ssh/gitlab ~/.ssh/bitbucket; do
         if [ -f "$key" ] && [[ $key != *".pub" ]]; then
             keys+=("$key")
             echo -e "\n$i. Key: ${GREEN}$(basename "$key")${NC}"
@@ -198,32 +229,24 @@ delete_key() {
             ((i++))
         fi
     done
-
     if [ ${#keys[@]} -eq 0 ]; then
         echo -e "${RED}No SSH keys found to delete.${NC}"
         return 1
     fi
-
     read -p "Enter the number of the key you want to delete (1-${#keys[@]}): " key_number
-
     if [[ $key_number -lt 1 || $key_number -gt ${#keys[@]} ]]; then
         echo -e "${RED}Invalid selection. Please enter a number between 1 and ${#keys[@]}.${NC}"
         return 1
     fi
-
     key_to_delete="${keys[$((key_number-1))]}"
     key_name=$(basename "$key_to_delete")
-
     # Remove key from SSH agent
     ssh-add -d "$key_to_delete"
-
     # Remove key from SSH config
     sed -i.bak "/Host.*${key_name//\//\\/}/d" "$HOME/.ssh/config"
-
     # Remove key files
     rm "$key_to_delete"
     rm "${key_to_delete}.pub"
-
     echo -e "${GREEN}SSH key '${key_name}' deleted successfully!${NC}"
 }
 
@@ -231,7 +254,6 @@ delete_key() {
 while true; do
     show_menu
     read -p "Enter choice (1-7): " choice
-
     case $choice in
         1) generate_ssh_key ;;
         2) show_instructions ;;
