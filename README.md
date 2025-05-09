@@ -146,4 +146,4 @@ chmod 700 ~/.ssh
 git config --global core.autocrlf input
 ```
 
-[Rest of the README remains the same...]
+[Rest of the README remains the same....]
