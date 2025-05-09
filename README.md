@@ -9,7 +9,7 @@ A bash script for managing multiple SSH keys for different Git providers (GitHub
 - Bash shell
 - SSH client (`openssh-client`)
 
-### Windows
+### Windows 10 & 11
 - [Git for Windows](https://gitforwindows.org/) (includes Git Bash)
 - Run the script from Git Bash, NOT from Command Prompt or PowerShell
 - If you haven't installed Git for Windows:
