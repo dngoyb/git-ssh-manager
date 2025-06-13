@@ -74,7 +74,12 @@ generate_ssh_key() {
     echo "1. GitHub"
     echo "2. GitLab"
     echo "3. Bitbucket"
-    read -p "Enter choice (1-3): " provider
+    echo "0. Go back"
+    read -p "Enter choice (0-3): " provider
+    if [[ $provider -eq 0 ]]; then
+        echo -e "${BLUE}Returning to main menu...${NC}"
+        return 0
+    fi
     case $provider in
         1) provider_name="github" ;;
         2) provider_name="gitlab" ;;
@@ -146,19 +151,83 @@ generate_ssh_key() {
 }
 
 # Function to test SSH connection
+# Updated to support multiple keys/identifiers for each provider
 test_connection() {
     echo -e "\n${BLUE}=== Test SSH Connection ===${NC}"
     echo "Select Git provider:"
     echo "1. GitHub"
     echo "2. GitLab"
     echo "3. Bitbucket"
-    read -p "Enter choice (1-3): " provider
+    echo "0. Go back"
+    read -p "Enter choice (0-3): " provider
+    if [[ $provider -eq 0 ]]; then
+        echo -e "${BLUE}Returning to main menu...${NC}"
+        return 0
+    fi
     case $provider in
-        1) ssh -T git@github.com ;;
-        2) ssh -T git@gitlab.com ;;
-        3) ssh -T git@bitbucket.org ;;
-        *) echo -e "${RED}Invalid choice${NC}" ;;
+        1)
+            # List GitHub keys
+            keys=(~/.ssh/github_* ~/.ssh/github)
+            ;;
+        2)
+            # List GitLab keys
+            keys=(~/.ssh/gitlab_* ~/.ssh/gitlab)
+            ;;
+        3)
+            # List Bitbucket keys
+            keys=(~/.ssh/bitbucket_* ~/.ssh/bitbucket)
+            ;;
+        *)
+            echo -e "${RED}Invalid choice${NC}"
+            return 1
+            ;;
     esac
+
+    # Filter out non-existent files and .pub files
+    valid_keys=()
+    host_aliases=()
+    for key in "${keys[@]}"; do
+        if [ -f "$key" ] && [[ $key != *.pub ]]; then
+            valid_keys+=("$key")
+            base=$(basename "$key")
+            # Determine host alias
+            if [[ "$base" == *_* ]]; then
+                # e.g., gitlab_work -> gitlab.com-work
+                provider_name="${base%%_*}"
+                identifier="${base#*_}"
+                host_alias="${provider_name}.com-${identifier}"
+            else
+                # e.g., gitlab -> gitlab.com
+                provider_name="$base"
+                host_alias="${provider_name}.com"
+            fi
+            host_aliases+=("$host_alias")
+        fi
+    done
+
+    if [ ${#valid_keys[@]} -eq 0 ]; then
+        echo -e "${RED}No SSH keys found for this provider.${NC}"
+        return 1
+    fi
+
+    echo -e "\n${BLUE}Available keys for this provider:${NC}"
+    for i in "${!valid_keys[@]}"; do
+        echo "$((i+1)). $(basename "${valid_keys[$i]}") (Host: ${host_aliases[$i]})"
+    done
+    echo "----------------------"
+    echo "0. Go back"
+    read -p "Select key to test (0 to go back, 1-${#valid_keys[@]}): " key_choice
+    if [[ $key_choice -eq 0 ]]; then
+        echo -e "${BLUE}Returning to main menu...${NC}"
+        return 0
+    fi
+    if [[ $key_choice -lt 1 || $key_choice -gt ${#valid_keys[@]} ]]; then
+        echo -e "${RED}Invalid selection.${NC}"
+        return 1
+    fi
+    selected_host="${host_aliases[$((key_choice-1))]}"
+    echo -e "\nTesting SSH connection to $selected_host...\n"
+    ssh -T git@"$selected_host"
 }
 
 # Function to configure Git user
@@ -233,7 +302,17 @@ delete_key() {
         echo -e "${RED}No SSH keys found to delete.${NC}"
         return 1
     fi
-    read -p "Enter the number of the key you want to delete (1-${#keys[@]}): " key_number
+    echo -e "\n${BLUE}Available keys to delete:${NC}"
+    for idx in "${!keys[@]}"; do
+        echo "$((idx+1)). $(basename "${keys[$idx]}")"
+    done
+    echo "----------------------"
+    echo "0. Go back"
+    read -p "Enter the number of the key you want to delete (0 to go back, 1-${#keys[@]}): " key_number
+    if [[ $key_number -eq 0 ]]; then
+        echo -e "${BLUE}Returning to main menu...${NC}"
+        return 0
+    fi
     if [[ $key_number -lt 1 || $key_number -gt ${#keys[@]} ]]; then
         echo -e "${RED}Invalid selection. Please enter a number between 1 and ${#keys[@]}.${NC}"
         return 1
